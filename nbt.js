@@ -11,7 +11,7 @@
 */
 
 (function() {
-	var compress = require('compress'),
+	var zlib = require('zlib'),
 		binary = require('./binary');
 		
 	
@@ -37,6 +37,13 @@
 			}
 		}
 	});
+
+	var hasGzipHeader = function(data){
+		var result=true;
+		if(data[0]!=0x1f) result=false;
+		if(data[1]!=0x8b) result=false;
+		return result;
+	}
 
 	var ValueReader = function(binaryReader) {
 		var intReader = function(bits) {
@@ -128,9 +135,8 @@
 	}
 
 	this.parse = function(data, callback) {
-		if (compress.hasGzipHeader(data)) {
-			var gunzip = new compress.Gunzip();
-			gunzip.write(data, function(error, uncompressed) {
+		if (hasGzipHeader(data)) {
+			zlib.unzip(data, function(error, uncompressed) {
 				if (error) {
 					callback(error, data);
 				} else {
