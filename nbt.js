@@ -39,6 +39,13 @@
 		}
 	});
 
+	var hasGzipHeader = function(data){
+		var result=true;
+		if(data[0]!=0x1f) result=false;
+		if(data[1]!=0x8b) result=false;
+		return result;
+	}
+
 	var ValueReader = function(binaryReader) {
 		var intReader = function(bits) {
 			return function() {
@@ -140,12 +147,16 @@
 	}
 
 	this.parse = function(data, callback) {
-    zlib.unzip(data, function(err, uncompressed) {
-      if (err) {
-        callback(null, parseUncompressed(data));
-      } else {
-        callback(null, parseUncompressed(uncompressed));
-      }
-    });
-  };
+		if (hasGzipHeader(data)) {
+			zlib.unzip(data, function(error, uncompressed) {
+				if (error) {
+					callback(error, data);
+				} else {
+					callback(null, parseUncompressed(uncompressed));
+				}
+			});
+		} else {
+			callback(null, parseUncompressed(data));
+		}
+	};
 }).apply(exports || (nbt = {}));
