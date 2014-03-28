@@ -1,9 +1,10 @@
-NBT.js
+NBT.js [![Build Status](https://travis-ci.org/sjmulder/nbt-js.png?branch=master)](https://travis-ci.org/sjmulder/nbt-js)
 ======
 
 by Sijmen Mulder.
 
 NBT.js is a JavaScript parser [NBT](http://www.minecraft.net/docs/NBT.txt) archives, for use with [Node.js](http://nodejs.org/).
+
 
 Usage
 -----
@@ -12,10 +13,10 @@ After `var nbt = require('nbt')`, you can use `nbt.parse(data, callback)` to con
 
     var fs = require('fs'),
     	nbt = require('nbt');
-    
+
     fs.readFile('bigtest.nbt', function(error, data) {
     	if (error) throw error;
-    	
+
 		nbt.parse(data, function(error, result) {
 	    	console.log(result.Level.stringTest);
 	    	console.log(result.Level['nested compound test']);
@@ -26,14 +27,22 @@ If the data is gzipped, it is automatically decompressed first.
 
 Tag names are copied verbatim, and as some names are not valid JavaScript names, use of the indexer may be required – such as with the nested compound test in the example above.
 
-Byte arrays are returned as Node.js `Buffer` objects.
+
+Development and testing
+-----------------------
+
+[Grunt](http://gruntjs.com) is used as a task runner:
+
+    grunt jshint  # Check code quality
+    grunt test    # Run tests
+    grunt watch   # Do the above two on every file change
+
 
 Known issues
 ------------
 
- * No formal test cases (only a sample program)
- * 64 bit integers overflow
- * Unicode may not be handled correctly for gzipped archives
+ * [64 bit integers overflow](https://github.com/sjmulder/nbt-js/issues/1)
+
 
 Copyright
 ---------

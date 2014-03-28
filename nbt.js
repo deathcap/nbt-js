@@ -1,4 +1,4 @@
-/* 
+/*
 	NBT.js - a JavaScript parser for NBT archives
 	by Sijmen Mulder
 
@@ -11,33 +11,34 @@
 */
 
 (function() {
-	var zlib = require('zlib'),
-		binary = require('./binary');
-		
-	
-	var tagTypes = {
-		end: 0,
-		byte: 1,
-		short: 2,
-		int: 3,
-		long: 4,
-		float: 5,
-		double: 6,
-		byteArray: 7,
-		string: 8,
-		list: 9,
-		compound: 10,
-		intArray: 11
+	'use strict';
+
+	var nbt = this;
+	var zlib = require('zlib');
+
+	nbt.tagTypes = {
+		'end': 0,
+		'byte': 1,
+		'short': 2,
+		'int': 3,
+		'long': 4,
+		'float': 5,
+		'double': 6,
+		'byteArray': 7,
+		'string': 8,
+		'list': 9,
+		'compound': 10,
+		'intArray': 11
 	};
 
-	var tagTypeNames = new (function() {
-		var typeName;
-		for (typeName in tagTypes) {
-			if (tagTypes.hasOwnProperty(typeName)) {
-				this[tagTypes[typeName]] = typeName;
+	nbt.tagTypeNames = {};
+	(function() {
+		for (var typeName in nbt.tagTypes) {
+			if (nbt.tagTypes.hasOwnProperty(typeName)) {
+				nbt.tagTypeNames[nbt.tagTypes[typeName]] = typeName;
 			}
 		}
-	});
+	})();
 
 	var hasGzipHeader = function(data){
 		var result=true;
@@ -46,37 +47,39 @@
 		return result;
 	}
 
-	var ValueReader = function(binaryReader) {
-		var intReader = function(bits) {
-			return function() {
-				return binaryReader.int(bits, true);
-			};
+	nbt.Reader = function(buffer) {
+		var offset = 0;
+
+		function read(dataType, size) {
+			var val = buffer['read' + dataType](offset);
+			offset += size;
+			return val;
+		}
+
+		this[nbt.tagTypes.byte]   = read.bind(this, 'Int8', 1);
+		this[nbt.tagTypes.short]  = read.bind(this, 'Int16BE', 2);
+		this[nbt.tagTypes.int]    = read.bind(this, 'Int32BE', 4);
+		this[nbt.tagTypes.float]  = read.bind(this, 'FloatBE', 4);
+		this[nbt.tagTypes.double] = read.bind(this, 'DoubleBE', 8);
+
+		this[nbt.tagTypes.long] = function() {
+			/* FIXME: this can overflow, JS has 53 bit precision */
+			var upper = this.int();
+			var lower = this.int();
+			return (upper << 32) + lower;
 		};
 
-		var floatReader = function(precisionBits, exponentBits) {
-			return function() {
-				return binaryReader.float(precisionBits, exponentBits);
-			};
-		};
-		
-		this[tagTypes.byte] = intReader(8);
-		this[tagTypes.short] = intReader(16);
-		this[tagTypes.int] = intReader(32);
-		this[tagTypes.long] = intReader(64);
-		this[tagTypes.float] = floatReader(23, 8);
-		this[tagTypes.double] = floatReader(52, 11);
-
-		this[tagTypes.byteArray] = function() {
+		this[nbt.tagTypes.byteArray] = function() {
 			var length = this.int();
 			var bytes = [];
 			var i;
 			for (i = 0; i < length; i++) {
 				bytes.push(this.byte());
 			}
-			return new Buffer(bytes);
+			return bytes;
 		};
 
-		this[tagTypes.intArray] = function() {
+		this[nbt.tagTypes.intArray] = function() {
 			var length = this.int();
 			var ints = [];
 			var i;
@@ -86,13 +89,14 @@
 			return ints;
 		};
 
-
-		this[tagTypes.string] = function() {
+		this[nbt.tagTypes.string] = function() {
 			var length = this.short();
-			return binaryReader.utf8(length);
+			var val = buffer.toString('utf8', offset, offset + length);
+			offset += length;
+			return val;
 		};
 
-		this[tagTypes.list] = function() {
+		this[nbt.tagTypes.list] = function() {
 			var type = this.byte();
 			var length = this.int();
 			var values = [];
@@ -103,11 +107,11 @@
 			return values;
 		};
 
-		this[tagTypes.compound] = function() {
+		this[nbt.tagTypes.compound] = function() {
 			var values = {};
 			while (true) {
 				var type = this.byte();
-				if (type === tagTypes.end) {
+				if (type === nbt.tagTypes.end) {
 					break;
 				}
 				var name = this.string();
@@ -116,27 +120,27 @@
 			}
 			return values;
 		};
-		
+
 		var typeName;
-		for (typeName in tagTypes) {
-			if (tagTypes.hasOwnProperty(typeName)) {
-				this[typeName] = this[tagTypes[typeName]];
+		for (typeName in nbt.tagTypes) {
+			if (nbt.tagTypes.hasOwnProperty(typeName)) {
+				this[typeName] = this[nbt.tagTypes[typeName]];
 			}
 		}
 	};
 
 	var parseUncompressed = function(data) {
-		var binaryReader = new binary.BinaryReader(data, true);
-		var valueReader = new ValueReader(binaryReader);
-		
-		var type = valueReader.byte();
-		if (type !== tagTypes.compound) {
+		var buffer = new Buffer(data);
+		var reader = new nbt.Reader(buffer);
+
+		var type = reader.byte();
+		if (type !== nbt.tagTypes.compound) {
 			throw new Error('Top tag should be a compound');
 		}
-		
-		var name = valueReader.string();
-		var value = valueReader.compound();
-		
+
+		var name = reader.string();
+		var value = reader.compound();
+
 		if (name === '') {
 			return value;
 		} else {
